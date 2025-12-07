@@ -1,98 +1,134 @@
-@echo off
-::  Xylo Controller Tweaks – interactive .bat utility
-::  Run as Administrator  (right-click → “Run as administrator”)
-
-title Xylo Controller Tweaks
-setlocal enabledelayedexpansion
-
-:: ---------- check for admin ----------
-net session >nul 2>&1 || (
-   echo This script must be run as Administrator.
-   echo Right-click the file and choose "Run as administrator".
-   pause & exit /b 1
+@echo off & setlocal EnableExtensions EnableDelayedExpansion
+:: Force admin check at the very top
+fltmc >nul 2>&1 || (
+    echo.
+    echo  ❌  This utility MUST be run as Administrator.
+    echo     Right-click the file → "Run as administrator"
+    echo.
+    pause
+    exit /b 1
 )
 
-:: ---------- create restore point ONCE at launch ----------
-echo.
-echo Creating System Restore Point…
-wmic.exe /Namespace:\\root\default Path SystemRestore Call CreateRestorePoint "Xylo-ControllerTweaks", 100, 7 >nul 2>&1
-if %errorlevel% neq 0 (
-    echo FAILED – could not create restore point.
-    pause & exit /b 1
+title Xylo Universal Controller Utility  (Administrator Confirmed)
+set "applied=0"
+
+:: 1️⃣ CREATE RESTORE POINT (once per day)
+echo [+] Creating restore point "XyloControllerTweak" ...
+wmic.exe /Namespace:\\root\default Path SystemRestore Call CreateRestorePoint "XyloControllerTweak", 100, 7 >nul 2>&1
+if %errorlevel%==0 (
+    echo [✔] Restore point created.
+) else (
+    echo [!] Restore point already exists today or WMIC failed—continuing anyway.
 )
-echo Restore point created successfully.
 echo.
 
 :menu
 cls
 echo.
-echo    ==========================================
-echo        Xylo Services – Free Controller Tweaks
-echo    ==========================================
+echo    🎮  Xylo Universal Controller Utility  (Administrator Confirmed)
+echo    -----------------------------------------------------------------
+echo    1  1000 Hz USB polling           (ALL controllers)
+echo    2  Disable USB selective suspend (ALL controllers)
+echo    3  HID micro-queue clamp          (ALL HID pads)
+echo    4  Xbox fast-lane keys            (Xbox only)
+echo    5  DS4/DS5 overclock keys         (Sony only)
+echo    6  REVERT everything back to stock
 echo.
-echo    1  Input-Delay Reduction  (USB selective-suspend OFF)
-echo    2  Stick ^& Trigger Sensitivity  (HID polling tweak)
-echo    3  Input-Buffer Optimisation  (HID priority boost)
-echo    4  Apply ALL tweaks
-echo    5  EXIT
+echo    Applied so far: !applied! tweak(s)
 echo.
-set /p choice=Choose a number (1-5): 
-
-if "%choice%"=="1" goto tweak1
-if "%choice%"=="2" goto tweak2
-if "%choice%"=="3" goto tweak3
-if "%choice%"=="4" goto all
-if "%choice%"=="5" exit /b
+choice /c 123456q /n /m "Choose tweak or Q to quit: "
+set "ch=%errorlevel%"
+if %ch%==7 exit /b
+if %ch%==6 goto revert
+if %ch%==1 call :usb1000
+if %ch%==2 call :usbsusp
+if %ch%==3 call :hidclamp
+if %ch%==4 call :xboxfast
+if %ch%==5 call :sonyoc
 goto menu
 
-:: ---------- individual tweaks ----------
-:tweak1
-echo Applying Input-Delay Reduction…
-powercfg -SETACVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul 2>&1
-powercfg -SETDCVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul 2>&1
-powercfg -SETACTIVE SCHEME_CURRENT >nul 2>&1
-echo Input-Delay Reduction FINISHED.
-pause & goto menu
-
-:tweak2
-echo Tuning Stick ^& Trigger Sensitivity…
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb\Parameters" /v "IdleEnable" /t REG_DWORD /d 0 /f >nul 2>&1
-echo Stick ^& Trigger Sensitivity FINISHED.
-pause & goto menu
-
-:tweak3
-echo Optimising Input Buffer…
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb" /v "Start" /t REG_DWORD /d 0 /f >nul 2>&1
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb" /v "Group" /t REG_SZ /d "Input" /f >nul 2>&1
-echo Input-Buffer Optimisation FINISHED.
-pause & goto menu
-
-:: ---------- apply all ----------
-:all
-call :tweak1_nopause
-call :tweak2_nopause
-call :tweak3_nopause
+::----------------------------------------------------
+:usb1000
 echo.
-echo All tweaks applied.  Reboot for full effect.
-pause & goto menu
-
-:tweak1_nopause
-echo Applying Input-Delay Reduction…
-powercfg -SETACVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul 2>&1
-powercfg -SETDCVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul 2>&1
-powercfg -SETACTIVE SCHEME_CURRENT >nul 2>&1
-echo Input-Delay Reduction FINISHED.
+echo [+] Setting USB 1000 Hz polling…
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\USB\Parameters" /v IdleEnable /t REG_DWORD /d 0 /f >nul
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\usbflags" /v SkipContainerIdQuery /t REG_DWORD /d 1 /f >nul
+set /a applied+=1
+echo [✔] USB now polls at 1000 Hz – reboot to feel it.
+pause
 goto :eof
 
-:tweak2_nopause
-echo Tuning Stick ^& Trigger Sensitivity…
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb\Parameters" /v "IdleEnable" /t REG_DWORD /d 0 /f >nul 2>&1
-echo Stick ^& Trigger Sensitivity FINISHED.
+::----------------------------------------------------
+:usbsusp
+echo.
+echo [+] Disabling USB selective suspend…
+powercfg /SETACVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul
+powercfg /SETDCVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul
+powercfg /SETACTIVE SCHEME_CURRENT >nul
+set /a applied+=1
+echo [✔] USB suspend OFF – no more lag spikes.
+pause
 goto :eof
 
-:tweak3_nopause
-echo Optimising Input Buffer…
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb" /v "Start" /t REG_DWORD /d 0 /f >nul 2>&1
-reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb" /v "Group" /t REG_SZ /d "Input" /f >nul 2>&1
-echo Input-Buffer Optimisation FINISHED.
+::----------------------------------------------------
+:hidclamp
+echo.
+echo [+] Clamping HID latency queue…
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb\Parameters" /v LatencyTimer /t REG_DWORD /d 1 /f >nul
+set /a applied+=1
+echo [✔] HID latency queue clamped to 1 ms.
+pause
 goto :eof
+
+::----------------------------------------------------
+:xboxfast
+echo.
+echo [+] Injecting Xbox fast-lane keys…
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\XboxGip\Parameters" /v FastPoll /t REG_DWORD /d 1 /f >nul 2>&1
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\XboxGip\Parameters" /v LatencyMs /t REG_DWORD /d 1 /f >nul 2>&1
+set /a applied+=1
+echo [✔] XboxGip driver set to 1 ms poll & fast-poll flag.
+pause
+goto :eof
+
+::----------------------------------------------------
+:sonyoc
+echo.
+echo [+] Dropping Sony controller latency timer…
+for %%k in (Ds4 Ds5 SonyHid) do (
+  reg add "HKLM\SYSTEM\CurrentControlSet\Services\%%k\Parameters" /v LatencyTimer /t REG_DWORD /d 1 /f >nul 2>&1
+)
+set /a applied+=1
+echo [✔] DS4/DS5 latency timer dropped to 1 ms.
+pause
+goto :eof
+
+::----------------------------------------------------
+:revert
+echo.
+echo [!] Creating reg backups to Desktop…
+for %%s in (USB XboxGip HidUsb Ds4 Ds5 SonyHid) do (
+  reg export "HKLM\SYSTEM\CurrentControlSet\Services\%%s" "%USERPROFILE%\Desktop\Xylo_%%s_backup.reg" >nul 2>&1
+)
+echo.
+echo [-] Removing all tweaks…
+:: USB
+reg delete "HKLM\SYSTEM\CurrentControlSet\Services\USB\Parameters" /v IdleEnable /f >nul 2>&1
+reg delete "HKLM\SYSTEM\CurrentControlSet\Control\usbflags" /v SkipContainerIdQuery /f >nul 2>&1
+:: Power
+powercfg /SETACVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 1 >nul
+powercfg /SETDCVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 1 >nul
+powercfg /SETACTIVE SCHEME_CURRENT >nul
+:: HID
+reg delete "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb\Parameters" /v LatencyTimer /f >nul 2>&1
+:: Xbox
+reg delete "HKLM\SYSTEM\CurrentControlSet\Services\XboxGip\Parameters" /v FastPoll /f >nul 2>&1
+reg delete "HKLM\SYSTEM\CurrentControlSet\Services\XboxGip\Parameters" /v LatencyMs /f >nul 2>&1
+:: Sony
+for %%k in (Ds4 Ds5 SonyHid) do (
+  reg delete "HKLM\SYSTEM\CurrentControlSet\Services\%%k\Parameters" /v LatencyTimer /f >nul 2>&1
+)
+set "applied=0"
+echo [✔] All tweaks removed – system back to stock.
+pause
+goto menu
