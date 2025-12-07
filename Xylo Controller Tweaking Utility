@@ -1,0 +1,98 @@
+@echo off
+::  Xylo Controller Tweaks – interactive .bat utility
+::  Run as Administrator  (right-click → “Run as administrator”)
+
+title Xylo Controller Tweaks
+setlocal enabledelayedexpansion
+
+:: ---------- check for admin ----------
+net session >nul 2>&1 || (
+   echo This script must be run as Administrator.
+   echo Right-click the file and choose "Run as administrator".
+   pause & exit /b 1
+)
+
+:: ---------- create restore point ONCE at launch ----------
+echo.
+echo Creating System Restore Point…
+wmic.exe /Namespace:\\root\default Path SystemRestore Call CreateRestorePoint "Xylo-ControllerTweaks", 100, 7 >nul 2>&1
+if %errorlevel% neq 0 (
+    echo FAILED – could not create restore point.
+    pause & exit /b 1
+)
+echo Restore point created successfully.
+echo.
+
+:menu
+cls
+echo.
+echo    ==========================================
+echo        Xylo Services – Free Controller Tweaks
+echo    ==========================================
+echo.
+echo    1  Input-Delay Reduction  (USB selective-suspend OFF)
+echo    2  Stick ^& Trigger Sensitivity  (HID polling tweak)
+echo    3  Input-Buffer Optimisation  (HID priority boost)
+echo    4  Apply ALL tweaks
+echo    5  EXIT
+echo.
+set /p choice=Choose a number (1-5): 
+
+if "%choice%"=="1" goto tweak1
+if "%choice%"=="2" goto tweak2
+if "%choice%"=="3" goto tweak3
+if "%choice%"=="4" goto all
+if "%choice%"=="5" exit /b
+goto menu
+
+:: ---------- individual tweaks ----------
+:tweak1
+echo Applying Input-Delay Reduction…
+powercfg -SETACVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul 2>&1
+powercfg -SETDCVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul 2>&1
+powercfg -SETACTIVE SCHEME_CURRENT >nul 2>&1
+echo Input-Delay Reduction FINISHED.
+pause & goto menu
+
+:tweak2
+echo Tuning Stick ^& Trigger Sensitivity…
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb\Parameters" /v "IdleEnable" /t REG_DWORD /d 0 /f >nul 2>&1
+echo Stick ^& Trigger Sensitivity FINISHED.
+pause & goto menu
+
+:tweak3
+echo Optimising Input Buffer…
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb" /v "Start" /t REG_DWORD /d 0 /f >nul 2>&1
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb" /v "Group" /t REG_SZ /d "Input" /f >nul 2>&1
+echo Input-Buffer Optimisation FINISHED.
+pause & goto menu
+
+:: ---------- apply all ----------
+:all
+call :tweak1_nopause
+call :tweak2_nopause
+call :tweak3_nopause
+echo.
+echo All tweaks applied.  Reboot for full effect.
+pause & goto menu
+
+:tweak1_nopause
+echo Applying Input-Delay Reduction…
+powercfg -SETACVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul 2>&1
+powercfg -SETDCVALUEINDEX SCHEME_CURRENT 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0 >nul 2>&1
+powercfg -SETACTIVE SCHEME_CURRENT >nul 2>&1
+echo Input-Delay Reduction FINISHED.
+goto :eof
+
+:tweak2_nopause
+echo Tuning Stick ^& Trigger Sensitivity…
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb\Parameters" /v "IdleEnable" /t REG_DWORD /d 0 /f >nul 2>&1
+echo Stick ^& Trigger Sensitivity FINISHED.
+goto :eof
+
+:tweak3_nopause
+echo Optimising Input Buffer…
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb" /v "Start" /t REG_DWORD /d 0 /f >nul 2>&1
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\HidUsb" /v "Group" /t REG_SZ /d "Input" /f >nul 2>&1
+echo Input-Buffer Optimisation FINISHED.
+goto :eof
